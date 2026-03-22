@@ -154,50 +154,66 @@ if page == "Inventory":
     else:
         df = df.sort_values(by="Card")
 
-    # 📋 DISPLAY
+    # 📋 INLINE DISPLAY + EDIT + DELETE
     for i, row in df.iterrows():
 
-        col1, col2, col3 = st.columns([4, 2, 2])
+        col1, col2, col3, col4 = st.columns([4, 2, 1, 1])
 
+        # CARD INFO
         with col1:
             st.markdown(f"**{row['Card']}**")
             st.caption(row["Condition"])
 
+        # PRICE
         with col2:
             st.write(f"${row['Last Price']}")
 
+        # EDIT BUTTON
         with col3:
-            if st.button("Edit", key=f"edit_{i}"):
-                st.session_state["edit_index"] = i
+            if st.button("✏️", key=f"edit_{i}"):
+                st.session_state[f"editing_{i}"] = True
 
-        if st.button("Delete", key=f"delete_{i}"):
-            df = df.drop(i)
-            save_inventory(df)
-            st.experimental_rerun()
+        # DELETE BUTTON
+        with col4:
+            if st.button("🗑️", key=f"delete_{i}"):
+                df = df.drop(i)
+                save_inventory(df)
+                st.experimental_rerun()
 
-    st.divider()
+        # INLINE EDIT MODE
+        if st.session_state.get(f"editing_{i}", False):
 
-    # ✏️ EDIT
-    if "edit_index" in st.session_state:
-        idx = st.session_state["edit_index"]
+            new_name = st.text_input(
+                "Card Name",
+                value=row["Card"],
+                key=f"name_{i}"
+            )
 
-        st.subheader("Edit Card")
+            new_condition = st.selectbox(
+                "Condition",
+                ["Raw", "PSA 10", "PSA 9"],
+                index=["Raw", "PSA 10", "PSA 9"].index(row["Condition"]),
+                key=f"cond_{i}"
+            )
 
-        edit_card = st.text_input("Card Name", df.loc[idx, "Card"])
-        edit_condition = st.selectbox(
-            "Condition",
-            ["Raw", "PSA 10", "PSA 9"],
-            index=["Raw", "PSA 10", "PSA 9"].index(df.loc[idx, "Condition"])
-        )
+            col_save, col_cancel = st.columns(2)
 
-        if st.button("Save Changes"):
-            df.loc[idx, "Card"] = edit_card
-            df.loc[idx, "Condition"] = edit_condition
-            save_inventory(df)
+            with col_save:
+                if st.button("Save", key=f"save_{i}"):
+                    df.loc[i, "Card"] = new_name
+                    df.loc[i, "Condition"] = new_condition
+                    save_inventory(df)
 
-            del st.session_state["edit_index"]
-            st.success("Updated!")
-            st.experimental_rerun()
+                    st.session_state[f"editing_{i}"] = False
+                    st.success("Updated!")
+                    st.experimental_rerun()
+
+            with col_cancel:
+                if st.button("Cancel", key=f"cancel_{i}"):
+                    st.session_state[f"editing_{i}"] = False
+                    st.experimental_rerun()
+
+        st.divider()
 
 
 # ==============================
@@ -226,7 +242,7 @@ if page == "Dashboard":
 
     st.divider()
 
-    # 📈 VALUE GRAPH
+    # VALUE GRAPH
     st.subheader("📈 Inventory Value Over Time")
 
     history_df = load_history()
