@@ -23,17 +23,78 @@ def get_ebay_sales(query):
 # ==============================
 st.set_page_config(page_title="Dubz Card Haven", layout="centered")
 
+# ==============================
+# 🎨 PREMIUM STYLE
+# ==============================
 st.markdown("""
 <style>
-.big-price {font-size: 48px; font-weight: bold; text-align:center; color:#FFD700;}
-.card-box {padding:12px; border-radius:12px; background:#1c1f26; margin-bottom:10px;}
+
+/* Background */
+body {
+    background: linear-gradient(135deg, #0e1117, #121826);
+}
+
+/* Big price */
+.big-price {
+    font-size: 56px;
+    font-weight: 900;
+    text-align: center;
+    color: #FFD700;
+    text-shadow: 0 0 15px rgba(255,215,0,0.4);
+    margin-bottom: 15px;
+}
+
+/* Card UI */
+.card {
+    background: linear-gradient(145deg, #1a1f2b, #232938);
+    border-radius: 16px;
+    padding: 14px;
+    margin-bottom: 12px;
+    border: 1px solid rgba(255,255,255,0.05);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+/* Accent */
+.accent {
+    color: #00f5ff;
+}
+
+/* Small text */
+.small-text {
+    color: #9ca3af;
+    font-size: 12px;
+}
+
+/* Buttons */
+button {
+    border-radius: 12px !important;
+    border: none !important;
+    background: linear-gradient(135deg, #ff00cc, #3333ff) !important;
+    color: white !important;
+    font-weight: 600 !important;
+}
+
+/* Layout spacing */
+.block-container {
+    padding-top: 1rem;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
+# ==============================
+# HEADER
+# ==============================
 st.image("logo.png", use_container_width=True)
 
+st.markdown("<h3 style='text-align:center;'>Dubz Card Haven</h3>", unsafe_allow_html=True)
+st.markdown(
+    "<p style='text-align:center; color:#00f5ff;'>Live Card Pricing • Inventory • Analytics</p>",
+    unsafe_allow_html=True
+)
+
 # ==============================
-# NAVIGATION
+# NAV
 # ==============================
 page = st.sidebar.selectbox("Menu", ["Comp Tool", "Inventory", "Dashboard"])
 
@@ -86,7 +147,12 @@ if page == "Comp Tool":
         st.markdown(f"<div class='big-price'>${avg}</div>", unsafe_allow_html=True)
 
         for title, price in sales:
-            st.write(f"${price} - {title}")
+            st.markdown(f"""
+            <div class="card">
+                <div style='color:#FFD700; font-weight:700;'>${price}</div>
+                <div class="small-text">{title}</div>
+            </div>
+            """, unsafe_allow_html=True)
 
 
 # ==============================
@@ -98,7 +164,7 @@ if page == "Inventory":
 
     df = load_inventory()
 
-    # ➕ ADD CARD
+    # ADD CARD
     with st.expander("➕ Add Card"):
         new_card = st.text_input("Card Name")
         new_condition = st.selectbox("Condition", ["Raw", "PSA 10", "PSA 9"])
@@ -116,7 +182,7 @@ if page == "Inventory":
 
     st.divider()
 
-    # 🔄 UPDATE PRICES + TRACK VALUE
+    # UPDATE PRICES + TRACK VALUE
     if st.button("🔄 Update Prices"):
         prices = []
 
@@ -128,7 +194,6 @@ if page == "Inventory":
         df["Last Price"] = prices
         save_inventory(df)
 
-        # 📈 TRACK TOTAL VALUE
         total_value = df["Last Price"].sum()
         history_df = load_history()
 
@@ -140,11 +205,11 @@ if page == "Inventory":
         history_df = pd.concat([history_df, new_entry], ignore_index=True)
         save_history(history_df)
 
-        st.success("Prices updated + value tracked!")
+        st.success("Prices updated!")
 
     st.divider()
 
-    # 📊 SORT
+    # SORT
     sort_option = st.selectbox("Sort By", ["Highest Value", "Lowest Value", "A-Z"])
 
     if sort_option == "Highest Value":
@@ -154,40 +219,35 @@ if page == "Inventory":
     else:
         df = df.sort_values(by="Card")
 
-    # 📋 INLINE DISPLAY + EDIT + DELETE
+    # DISPLAY + INLINE EDIT
     for i, row in df.iterrows():
 
         col1, col2, col3, col4 = st.columns([4, 2, 1, 1])
 
-        # CARD INFO
         with col1:
-            st.markdown(f"**{row['Card']}**")
-            st.caption(row["Condition"])
+            st.markdown(f"""
+            <div class="card">
+                <b>{row['Card']}</b><br>
+                <span class="small-text">{row['Condition']}</span>
+            </div>
+            """, unsafe_allow_html=True)
 
-        # PRICE
         with col2:
-            st.write(f"${row['Last Price']}")
+            st.markdown(f"<div style='color:#00f5ff; font-weight:700;'>${row['Last Price']}</div>", unsafe_allow_html=True)
 
-        # EDIT BUTTON
         with col3:
             if st.button("✏️", key=f"edit_{i}"):
                 st.session_state[f"editing_{i}"] = True
 
-        # DELETE BUTTON
         with col4:
             if st.button("🗑️", key=f"delete_{i}"):
                 df = df.drop(i)
                 save_inventory(df)
                 st.experimental_rerun()
 
-        # INLINE EDIT MODE
         if st.session_state.get(f"editing_{i}", False):
 
-            new_name = st.text_input(
-                "Card Name",
-                value=row["Card"],
-                key=f"name_{i}"
-            )
+            new_name = st.text_input("Card Name", row["Card"], key=f"name_{i}")
 
             new_condition = st.selectbox(
                 "Condition",
@@ -198,20 +258,17 @@ if page == "Inventory":
 
             col_save, col_cancel = st.columns(2)
 
-            with col_save:
-                if st.button("Save", key=f"save_{i}"):
-                    df.loc[i, "Card"] = new_name
-                    df.loc[i, "Condition"] = new_condition
-                    save_inventory(df)
+            if col_save.button("Save", key=f"save_{i}"):
+                df.loc[i, "Card"] = new_name
+                df.loc[i, "Condition"] = new_condition
+                save_inventory(df)
 
-                    st.session_state[f"editing_{i}"] = False
-                    st.success("Updated!")
-                    st.experimental_rerun()
+                st.session_state[f"editing_{i}"] = False
+                st.experimental_rerun()
 
-            with col_cancel:
-                if st.button("Cancel", key=f"cancel_{i}"):
-                    st.session_state[f"editing_{i}"] = False
-                    st.experimental_rerun()
+            if col_cancel.button("Cancel", key=f"cancel_{i}"):
+                st.session_state[f"editing_{i}"] = False
+                st.experimental_rerun()
 
         st.divider()
 
@@ -228,8 +285,19 @@ if page == "Dashboard":
     total_value = df["Last Price"].sum()
     total_cards = len(df)
 
-    st.metric("Total Value", f"${round(total_value,2)}")
-    st.metric("Total Cards", total_cards)
+    st.markdown(f"""
+    <div class="card">
+        <h3>Total Value</h3>
+        <div class="big-price">${round(total_value,2)}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown(f"""
+    <div class="card">
+        <h3>Total Cards</h3>
+        <div class="big-price">{total_cards}</div>
+    </div>
+    """, unsafe_allow_html=True)
 
     st.divider()
 
