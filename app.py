@@ -9,7 +9,7 @@ INVENTORY_FILE = "inventory.csv"
 HISTORY_FILE = "value_history.csv"
 
 # ==============================
-# MOCK DATA (works without API)
+# MOCK DATA
 # ==============================
 def get_ebay_sales(query):
     return [
@@ -24,14 +24,36 @@ def get_ebay_sales(query):
 st.set_page_config(page_title="Dubz Card Haven", layout="centered")
 
 # ==============================
-# 🎨 PREMIUM STYLE
+# 🎨 STYLE
 # ==============================
 st.markdown("""
 <style>
 
 /* Background */
-body {
-    background: linear-gradient(135deg, #0e1117, #121826);
+.stApp {
+    background: radial-gradient(circle at top, #1a1f2b 0%, #0e1117 60%);
+}
+
+/* Bottom nav */
+.nav {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    background: #121826;
+    padding: 10px;
+    display: flex;
+    justify-content: space-around;
+    border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+/* Card */
+.card {
+    background: linear-gradient(145deg, #1a1f2b, #232938);
+    border-radius: 16px;
+    padding: 14px;
+    margin-bottom: 12px;
+    border: 1px solid rgba(255,255,255,0.05);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.4);
 }
 
 /* Big price */
@@ -40,26 +62,10 @@ body {
     font-weight: 900;
     text-align: center;
     color: #FFD700;
-    text-shadow: 0 0 15px rgba(255,215,0,0.4);
-    margin-bottom: 15px;
-}
-
-/* Card UI */
-.card {
-    background: linear-gradient(145deg, #1a1f2b, #232938);
-    border-radius: 16px;
-    padding: 14px;
-    margin-bottom: 12px;
-    border: 1px solid rgba(255,255,255,0.05);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    text-shadow: 0 0 20px rgba(255,215,0,0.5);
 }
 
 /* Accent */
-.accent {
-    color: #00f5ff;
-}
-
-/* Small text */
 .small-text {
     color: #9ca3af;
     font-size: 12px;
@@ -68,15 +74,13 @@ body {
 /* Buttons */
 button {
     border-radius: 12px !important;
-    border: none !important;
     background: linear-gradient(135deg, #ff00cc, #3333ff) !important;
     color: white !important;
-    font-weight: 600 !important;
 }
 
-/* Layout spacing */
-.block-container {
-    padding-top: 1rem;
+/* Fix bottom spacing */
+.main {
+    padding-bottom: 80px;
 }
 
 </style>
@@ -89,14 +93,21 @@ st.image("logo.png", use_container_width=True)
 
 st.markdown("<h3 style='text-align:center;'>Dubz Card Haven</h3>", unsafe_allow_html=True)
 st.markdown(
-    "<p style='text-align:center; color:#00f5ff;'>Live Card Pricing • Inventory • Analytics</p>",
+    "<p style='text-align:center; color:#00f5ff;'>Track • Analyze • Flip smarter</p>",
     unsafe_allow_html=True
 )
 
 # ==============================
-# NAV
+# NAVIGATION STATE
 # ==============================
-page = st.sidebar.selectbox("Menu", ["Comp Tool", "Inventory", "Dashboard"])
+if "page" not in st.session_state:
+    st.session_state.page = "Comp Tool"
+
+# ==============================
+# PAGE SWITCH FUNCTION
+# ==============================
+def set_page(p):
+    st.session_state.page = p
 
 # ==============================
 # INVENTORY FUNCTIONS
@@ -109,9 +120,6 @@ def load_inventory():
 def save_inventory(df):
     df.to_csv(INVENTORY_FILE, index=False)
 
-# ==============================
-# HISTORY FUNCTIONS
-# ==============================
 def load_history():
     if os.path.exists(HISTORY_FILE):
         return pd.read_csv(HISTORY_FILE)
@@ -125,17 +133,14 @@ def save_history(df):
 # ==============================
 def analyze_card(card, condition):
     sales = get_ebay_sales(card)
-
     prices = [p for _, p in sales]
     avg = sum(prices) / len(prices)
-
     return round(avg, 2), sales
-
 
 # ==============================
 # 🔍 COMP TOOL
 # ==============================
-if page == "Comp Tool":
+if st.session_state.page == "Comp Tool":
 
     card = st.text_input("Search Card")
     condition = st.radio("", ["Raw", "PSA 10", "PSA 9"], horizontal=True)
@@ -149,47 +154,35 @@ if page == "Comp Tool":
         for title, price in sales:
             st.markdown(f"""
             <div class="card">
-                <div style='color:#FFD700; font-weight:700;'>${price}</div>
-                <div class="small-text">{title}</div>
+                <b>${price}</b><br>
+                <span class="small-text">{title}</span>
             </div>
             """, unsafe_allow_html=True)
-
 
 # ==============================
 # 📦 INVENTORY
 # ==============================
-if page == "Inventory":
-
-    st.title("📦 Inventory")
+if st.session_state.page == "Inventory":
 
     df = load_inventory()
 
-    # ADD CARD
     with st.expander("➕ Add Card"):
         new_card = st.text_input("Card Name")
         new_condition = st.selectbox("Condition", ["Raw", "PSA 10", "PSA 9"])
 
         if st.button("Add Card"):
-            if new_card:
-                new_row = pd.DataFrame([{
-                    "Card": new_card,
-                    "Condition": new_condition,
-                    "Last Price": 0
-                }])
-                df = pd.concat([df, new_row], ignore_index=True)
-                save_inventory(df)
-                st.success("Card added!")
+            df = pd.concat([df, pd.DataFrame([{
+                "Card": new_card,
+                "Condition": new_condition,
+                "Last Price": 0
+            }])])
+            save_inventory(df)
 
-    st.divider()
-
-    # UPDATE PRICES + TRACK VALUE
     if st.button("🔄 Update Prices"):
         prices = []
-
-        with st.spinner("Updating prices..."):
-            for _, row in df.iterrows():
-                avg, _ = analyze_card(row["Card"], row["Condition"])
-                prices.append(avg)
+        for _, row in df.iterrows():
+            avg, _ = analyze_card(row["Card"], row["Condition"])
+            prices.append(avg)
 
         df["Last Price"] = prices
         save_inventory(df)
@@ -197,128 +190,70 @@ if page == "Inventory":
         total_value = df["Last Price"].sum()
         history_df = load_history()
 
-        new_entry = pd.DataFrame([{
+        history_df = pd.concat([history_df, pd.DataFrame([{
             "Timestamp": pd.Timestamp.now(),
             "Total Value": total_value
-        }])
+        }])])
 
-        history_df = pd.concat([history_df, new_entry], ignore_index=True)
         save_history(history_df)
 
-        st.success("Prices updated!")
-
-    st.divider()
-
-    # SORT
-    sort_option = st.selectbox("Sort By", ["Highest Value", "Lowest Value", "A-Z"])
-
-    if sort_option == "Highest Value":
-        df = df.sort_values(by="Last Price", ascending=False)
-    elif sort_option == "Lowest Value":
-        df = df.sort_values(by="Last Price", ascending=True)
-    else:
-        df = df.sort_values(by="Card")
-
-    # DISPLAY + INLINE EDIT
     for i, row in df.iterrows():
 
-        col1, col2, col3, col4 = st.columns([4, 2, 1, 1])
+        col1, col2, col3, col4 = st.columns([4,2,1,1])
 
-        with col1:
-            st.markdown(f"""
-            <div class="card">
-                <b>{row['Card']}</b><br>
-                <span class="small-text">{row['Condition']}</span>
-            </div>
-            """, unsafe_allow_html=True)
+        col1.markdown(f"<div class='card'><b>{row['Card']}</b><br><span class='small-text'>{row['Condition']}</span></div>", unsafe_allow_html=True)
+        col2.markdown(f"<b style='color:#00f5ff;'>${row['Last Price']}</b>", unsafe_allow_html=True)
 
-        with col2:
-            st.markdown(f"<div style='color:#00f5ff; font-weight:700;'>${row['Last Price']}</div>", unsafe_allow_html=True)
+        if col3.button("✏️", key=f"edit_{i}"):
+            st.session_state[f"edit_{i}"] = True
 
-        with col3:
-            if st.button("✏️", key=f"edit_{i}"):
-                st.session_state[f"editing_{i}"] = True
+        if col4.button("🗑️", key=f"del_{i}"):
+            df = df.drop(i)
+            save_inventory(df)
+            st.experimental_rerun()
 
-        with col4:
-            if st.button("🗑️", key=f"delete_{i}"):
-                df = df.drop(i)
-                save_inventory(df)
-                st.experimental_rerun()
+        if st.session_state.get(f"edit_{i}", False):
+            new_name = st.text_input("Edit Name", row["Card"], key=f"name_{i}")
+            new_cond = st.selectbox("Condition", ["Raw","PSA 10","PSA 9"], key=f"cond_{i}")
 
-        if st.session_state.get(f"editing_{i}", False):
-
-            new_name = st.text_input("Card Name", row["Card"], key=f"name_{i}")
-
-            new_condition = st.selectbox(
-                "Condition",
-                ["Raw", "PSA 10", "PSA 9"],
-                index=["Raw", "PSA 10", "PSA 9"].index(row["Condition"]),
-                key=f"cond_{i}"
-            )
-
-            col_save, col_cancel = st.columns(2)
-
-            if col_save.button("Save", key=f"save_{i}"):
+            if st.button("Save", key=f"save_{i}"):
                 df.loc[i, "Card"] = new_name
-                df.loc[i, "Condition"] = new_condition
+                df.loc[i, "Condition"] = new_cond
                 save_inventory(df)
-
-                st.session_state[f"editing_{i}"] = False
+                st.session_state[f"edit_{i}"] = False
                 st.experimental_rerun()
-
-            if col_cancel.button("Cancel", key=f"cancel_{i}"):
-                st.session_state[f"editing_{i}"] = False
-                st.experimental_rerun()
-
-        st.divider()
-
 
 # ==============================
 # 📊 DASHBOARD
 # ==============================
-if page == "Dashboard":
-
-    st.title("📊 Dashboard")
+if st.session_state.page == "Dashboard":
 
     df = load_inventory()
 
     total_value = df["Last Price"].sum()
     total_cards = len(df)
 
-    st.markdown(f"""
-    <div class="card">
-        <h3>Total Value</h3>
-        <div class="big-price">${round(total_value,2)}</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown(f"""
-    <div class="card">
-        <h3>Total Cards</h3>
-        <div class="big-price">{total_cards}</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.divider()
-
-    st.subheader("Top Cards")
-
-    df_sorted = df.sort_values(by="Last Price", ascending=False)
-
-    for _, row in df_sorted.head(5).iterrows():
-        st.write(f"{row['Card']} - ${row['Last Price']}")
-
-    st.divider()
-
-    # VALUE GRAPH
-    st.subheader("📈 Inventory Value Over Time")
+    st.markdown(f"<div class='card'><h3>Total Value</h3><div class='big-price'>${total_value}</div></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='card'><h3>Total Cards</h3><div class='big-price'>{total_cards}</div></div>", unsafe_allow_html=True)
 
     history_df = load_history()
 
     if not history_df.empty:
         history_df["Timestamp"] = pd.to_datetime(history_df["Timestamp"])
-        history_df = history_df.sort_values("Timestamp")
-
         st.line_chart(history_df.set_index("Timestamp"))
-    else:
-        st.info("Update prices to start tracking value history.")
+
+# ==============================
+# 📱 BOTTOM NAV
+# ==============================
+st.markdown("<div class='nav'></div>", unsafe_allow_html=True)
+
+col1, col2, col3 = st.columns(3)
+
+if col1.button("🔍"):
+    set_page("Comp Tool")
+
+if col2.button("📦"):
+    set_page("Inventory")
+
+if col3.button("📊"):
+    set_page("Dashboard")
